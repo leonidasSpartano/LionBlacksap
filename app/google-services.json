@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "381372192142",
+    "firebase_url": "https://lionblacksap-bdc32-default-rtdb.firebaseio.com",
+    "project_id": "lionblacksap-bdc32",
+    "storage_bucket": "lionblacksap-bdc32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381372192142:android:dc3311cf264764c27080df",
+        "android_client_info": {
+          "package_name": "com.example.lionblacksap"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD85r14tcneqzuyMAFU457sOglKsaM_yho"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
