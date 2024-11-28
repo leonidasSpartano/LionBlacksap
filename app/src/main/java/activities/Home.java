@@ -34,16 +34,14 @@ public class Home extends AppCompatActivity {
         logoutButton = findViewById(R.id.logoutButton);
         userEmailInput = findViewById(R.id.userEmailInput);
 
-        // Obtén el UID del usuario desde el Intent
+        // Obtén el UID del usuario actual desde Firebase Realtime Database (por correo electrónico)
         String userId = getIntent().getStringExtra("userId");
         Log.d("Login", "UID recibido al Home: " + userId);
 
         if (userId != null) {
-            // Referencia a Firebase Realtime Database
             DatabaseReference userRef = FirebaseDatabase.getInstance()
                     .getReference("Users").child(userId).child("name");
 
-            // Obtén el nombre del usuario desde Firebase
             userRef.get().addOnCompleteListener(task -> {
                 if (task.isSuccessful()) {
                     if (task.getResult().exists()) {
@@ -63,49 +61,78 @@ public class Home extends AppCompatActivity {
             Log.e("Intent", "El UID del usuario no fue proporcionado.");
         }
 
-        // Acción al presionar el botón "Iniciar conversación"
         startConversationButton.setOnClickListener(v -> {
             String recipientEmail = userEmailInput.getText().toString().trim();
+            Log.d("FirebaseDebug", "Correo ingresado para buscar: " + recipientEmail);
 
             if (recipientEmail.isEmpty()) {
                 Toast.makeText(Home.this, "Por favor ingresa un correo electrónico", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Obtener el ID del usuario actual (senderId)
-            String senderId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+            DatabaseReference usersRef = FirebaseDatabase.getInstance().getReference("Users");
+            usersRef.orderByChild("mail").equalTo(recipientEmail).get().addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    if (task.getResult().exists()) {
+                        // Obtener el ID del remitente desde Realtime Database
+                        String senderId = task.getResult().getChildren().iterator().next().getKey();
+                        String senderName = task.getResult().getChildren().iterator().next().child("name").getValue(String.class);
 
-            // Crear un nuevo chat en Firebase
-            long timestamp = System.currentTimeMillis();
-            Chat newChat = new Chat("", recipientEmail, senderId, "", timestamp);
+                        Log.d("FirebaseDebug", "Sender ID: " + senderId);
+                        Log.d("FirebaseDebug", "Sender Name: " + senderName);
 
-            // Crear un ID único para el chat
-            String chatId = FirebaseDatabase.getInstance().getReference().child("chats").push().getKey();
-            newChat.setId(chatId);
+                        if (senderId != null && senderName != null) {
+                            // Obtener el receptor usando el correo ingresado
+                            usersRef.orderByChild("mail").equalTo(recipientEmail).get().addOnCompleteListener(userTask -> {
+                                if (userTask.isSuccessful() && userTask.getResult().exists()) {
+                                    String recipientId = userTask.getResult().getChildren().iterator().next().getKey();
+                                    Log.d("FirebaseDebug", "Recipient ID encontrado: " + recipientId);
 
-            // Guardar el chat en Firebase
-            if (chatId != null) {
-                DatabaseReference chatRef = FirebaseDatabase.getInstance().getReference("chats");
-                chatRef.child(chatId).setValue(newChat).addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        Toast.makeText(Home.this, "Conversación iniciada", Toast.LENGTH_SHORT).show();
+                                    if (recipientId != null) {
+                                        long timestamp = System.currentTimeMillis();
+                                        Chat newChat = new Chat(senderId, senderName, recipientId, recipientEmail, "", timestamp);
 
-                        // Navegar a la actividad ChatActivity con el chatId
-                        Intent intent = new Intent(Home.this, ChatActivity.class);
-                        intent.putExtra("chatId", chatId);  // Pasamos el ID del chat para cargarlo en la ChatActivity
-                        startActivity(intent);
+                                        String chatId = FirebaseDatabase.getInstance().getReference().child("chats").push().getKey();
+                                        newChat.setId(chatId);
+
+                                        DatabaseReference chatRef = FirebaseDatabase.getInstance().getReference("chats");
+                                        chatRef.child(chatId).setValue(newChat).addOnCompleteListener(chatTask -> {
+                                            if (chatTask.isSuccessful()) {
+                                                Toast.makeText(Home.this, "Conversación iniciada", Toast.LENGTH_SHORT).show();
+
+                                                Intent intent = new Intent(Home.this, ChatActivity.class);
+                                                intent.putExtra("chatId", chatId);
+                                                startActivity(intent);
+                                            } else {
+                                                Toast.makeText(Home.this, "Error al iniciar la conversación", Toast.LENGTH_SHORT).show();
+                                                Log.e("FirebaseDebug", "Error al guardar el chat en Firebase", chatTask.getException());
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    Toast.makeText(Home.this, "No se encontró al usuario con el correo ingresado.", Toast.LENGTH_SHORT).show();
+                                    Log.e("FirebaseDebug", "El correo ingresado no corresponde a ningún usuario.");
+                                }
+                            });
+                        } else {
+                            Toast.makeText(Home.this, "Error al obtener los datos del remitente", Toast.LENGTH_SHORT).show();
+                            Log.e("FirebaseDebug", "El ID o nombre del remitente no se pudo obtener.");
+                        }
                     } else {
-                        Toast.makeText(Home.this, "Error al iniciar la conversación", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(Home.this, "No se encontró al usuario con el correo ingresado.", Toast.LENGTH_SHORT).show();
+                        Log.e("FirebaseDebug", "El correo ingresado no corresponde a ningún usuario.");
                     }
-                });
-            }
+                } else {
+                    Toast.makeText(Home.this, "Error al buscar usuarios en Firebase", Toast.LENGTH_SHORT).show();
+                    Log.e("FirebaseDebug", "Error al buscar usuarios en Firebase", task.getException());
+                }
+            });
         });
 
-        // Acción al presionar el botón de "Cerrar sesión"
         logoutButton.setOnClickListener(v -> {
             FirebaseAuth.getInstance().signOut();
             startActivity(new Intent(Home.this, Login.class));
-            finish();  // Finaliza la actividad actual
+            finish();
         });
     }
 }
